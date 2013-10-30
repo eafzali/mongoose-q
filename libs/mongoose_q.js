@@ -3,23 +3,15 @@
 var
   Q = require('q'),
   MONGOOSE_MODEL_STATICS = [
-    // mongoose.Model static
-    'remove', 'ensureIndexes', 'find', 'findById', 'findOne', 'count', 'distinct',
-    'findOneAndUpdate', 'findByIdAndUpdate', 'findOneAndRemove', 'findByIdAndRemove',
-    'create', 'update', 'mapReduce', 'aggregate', 'populate',
-    // mongoose.Document static
-    'update'
+    "create", "remove", "populate", "aggregate", "ensureIndexes"
   ],
   MONGOOSE_MODEL_METHODS = [
     // mongoose.Model instance
-    'save', 'remove',
-    // mongoose.Document instance
-    'populate'
+    'save', 'remove'
   ],
   MONGOOSE_QUERY_METHODS = [
     // mongoose.Query instance
-    'find', 'exec', 'findOne', 'count', 'distinct', 'update', 'remove',
-    'findOneAndUpdate', 'findOneAndRemove'
+    'exec', 'remove'
   ],
   apslice = Array.prototype.slice;
 
@@ -36,12 +28,14 @@ var
  * @param {*} [spread=false] use spread for multi-results
  */
 function qualify(obj, funcNames, funcNameMapper, spread) {
+  var originals = {};
   funcNames.forEach(function (funcName) {
     if (typeof(obj[funcName]) !== 'function') {
       console.warn('***skip*** function not found:', funcName);
       return;
     }
-    obj[funcNameMapper(funcName)] = function () {
+    originals[funcName] = obj[funcName];
+    obj[funcName] = function () {
       var d = Q.defer();
       var args = apslice.call(arguments);
       args.push(function (err, result) {
@@ -57,7 +51,7 @@ function qualify(obj, funcNames, funcNameMapper, spread) {
       });
       // fix https://github.com/iolo/mongoose-q/issues/1
       // mongoose patches some instance methods after instantiation. :(
-      this[funcName].apply(this, args);
+      originals[funcName].apply(this, args);
       return d.promise;
     };
   });
@@ -78,7 +72,7 @@ function mongooseQ(mongoose, options) {
   var mongoose = mongoose || require('mongoose');
   options = options || {};
   var prefix = options.prefix || '';
-  var suffix = options.suffix || 'Q';
+  var suffix = options.suffix || '';
   var mapper = options.mapper || function (funcName) {
     return prefix + funcName + suffix;
   };
